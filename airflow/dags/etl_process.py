@@ -3,19 +3,18 @@ import datetime
 from airflow.decorators import dag, task
 
 markdown_text = """
-### ETL Process for Heart Disease Data
+### ETL Process for Rain in Australia dataset
 
-This DAG extracts information from the original CSV file stored in the UCI Machine Learning Repository of the 
-[Heart Disease repository](https://archive.ics.uci.edu/dataset/45/heart+disease). 
-It preprocesses the data by creating dummy variables and scaling numerical features.
-    
+This DAG extracts information from the original CSV file stored in Google Drive. 
+It preprocesses the data encoding categorical features and scaling numerical features.
+
 After preprocessing, the data is saved back into a S3 bucket as two separate CSV files: one for training and one for 
-testing. The split between the training and testing datasets is 70/30 and they are stratified.
+testing. The split between the training and testing datasets is 85/15 and they are stratified.
 """
 
 
 default_args = {
-    'owner': "Facundo Adrian Lucianna",
+    'owner': "Kevin Cajachuán, Augusto Doffo, Daniel Herrera",
     'depends_on_past': False,
     'schedule_interval': None,
     'retries': 1,
@@ -25,40 +24,32 @@ default_args = {
 
 
 @dag(
-    dag_id="process_etl_heart_data",
-    description="ETL process for heart data, separating the dataset into training and testing sets.",
+    dag_id="process_etl_rain_in_australia_data",
+    description="ETL process for rain in Australia data, separating the dataset into training and testing sets.",
     doc_md=markdown_text,
-    tags=["ETL", "Heart Disease"],
+    tags=["ETL", "Rain in Australia"],
     default_args=default_args,
     catchup=False,
 )
-def process_etl_heart_data():
+def process_etl_rain_in_australia_data():
 
     @task.virtualenv(
         task_id="obtain_original_data",
-        requirements=["ucimlrepo==0.0.3",
-                      "awswrangler==3.6.0"],
+        requirements=["awswrangler==3.6.0"],
         system_site_packages=True
     )
     def get_data():
         """
-        Load the raw data from UCI repository
+        Load the raw data from Google Drive
         """
         import awswrangler as wr
-        from ucimlrepo import fetch_ucirepo
-        from airflow.models import Variable
+        import pandas as pd
 
         # fetch dataset
-        heart_disease = fetch_ucirepo(id=45)
+        url = "https://drive.google.com/uc?export=download&id=13ooui3hVDHgG0XK0rnekt2T1AUgKSU-z"
+        dataframe = pd.read_csv(url)
 
-        data_path = "s3://data/raw/heart.csv"
-        dataframe = heart_disease.data.original
-
-        target_col = Variable.get("target_col_heart")
-
-        # Replace level of heart decease to just distinguish presence 
-        # (values 1,2,3,4) from absence (value 0).
-        dataframe.loc[dataframe[target_col] > 0, target_col] = 1
+        data_path = "s3://data/raw/weatherAUS.csv"
 
         wr.s3.to_csv(df=dataframe,
                      path=data_path,
@@ -66,13 +57,13 @@ def process_etl_heart_data():
 
 
     @task.virtualenv(
-        task_id="make_dummies_variables",
+        task_id="transform_data",
         requirements=["awswrangler==3.6.0"],
         system_site_packages=True
     )
-    def make_dummies_variables():
+    def transform_data():
         """
-        Convert categorical variables into one-hot encoding.
+        Transform data imputing nulls, encoding categorical features and treating outliers.
         """
         import json
         import datetime
@@ -86,28 +77,168 @@ def process_etl_heart_data():
 
         from airflow.models import Variable
 
-        data_original_path = "s3://data/raw/heart.csv"
-        data_end_path = "s3://data/raw/heart_dummies.csv"
-        dataset = wr.s3.read_csv(data_original_path)
+        # Read original data
+        data_original_path = "s3://data/raw/weatherAUS.csv"
+        original_dataset = wr.s3.read_csv(data_original_path)
 
-        # Clean duplicates
-        dataset.drop_duplicates(inplace=True, ignore_index=True)
-        # Drop NaN
-        dataset.dropna(inplace=True, ignore_index=True)
+        dataset = original_dataset.copy()
 
-        # Force type in categorical columns
-        dataset["cp"] = dataset["cp"].astype(int)
-        dataset["restecg"] = dataset["restecg"].astype(int)
-        dataset["slope"] = dataset["slope"].astype(int)
-        dataset["ca"] = dataset["ca"].astype(int)
-        dataset["thal"] = dataset["thal"].astype(int)
+        # Drop rows with null target
+        dataset = dataset.dropna(subset='RainTomorrow')
 
-        categories_list = ["cp", "restecg", "slope", "ca", "thal"]
-        dataset_with_dummies = pd.get_dummies(data=dataset,
-                                              columns=categories_list,
-                                              drop_first=True)
+        # Get categorical features
+        categories_list = dataset.select_dtypes(include=['object']).columns.tolist()
 
-        wr.s3.to_csv(df=dataset_with_dummies,
+        # Separate Date fields
+        def get_season(date):
+            month = date.month
+            if month in [12, 1, 2]:
+                return 'Summer'
+            elif month in [3, 4, 5]:
+                return 'Fall'
+            elif month in [6, 7, 8]:
+                return 'Winter'
+            elif month in [9, 10, 11]:
+                return 'Spring'
+
+        dataset['Date'] = pd.to_datetime(dataset['Date'])
+        dataset['Year'] = dataset['Date'].dt.year
+        dataset['Month'] = dataset['Date'].dt.month
+        dataset['Day'] = dataset['Date'].dt.day
+        dataset['Season'] = dataset['Date'].apply(get_season)
+        dataset.drop(columns='Date', inplace=True)
+
+        # Aggregate data in order to impute nulls
+        columns_with_nan = dataset.columns[dataset.isna().any()].tolist()
+        get_mode = lambda x: x.mode()[0] if not x.mode().empty else None
+
+        df_grouped_by_day_month_location = dataset.groupby(['Day', 'Month', 'Location'])[columns_with_nan].agg(get_mode)
+        df_grouped_by_month_location = dataset.groupby(['Month', 'Location'])[columns_with_nan].agg(get_mode)
+        df_grouped_by_location = dataset.groupby(['Location'])[columns_with_nan].agg(get_mode)
+
+        # Imputing functions
+        def get_imputed_value(row, col):
+            val_from_day = df_grouped_by_day_month_location.loc[(row['Day'], row['Month'], row['Location']), col]
+            if not pd.isna(val_from_day):
+                return val_from_day
+
+            val_from_month = df_grouped_by_month_location.loc[(row['Month'], row['Location']), col]
+            if not pd.isna(val_from_month):
+                return val_from_month
+
+            val_from_location = df_grouped_by_location.loc[(row['Location']), col]
+            if not pd.isna(val_from_location):
+                return val_from_location
+
+            return dataset[col].mode()[0]
+
+        def row_mode_imputer(row):
+            cols_to_fill = row[row.isnull()].index.values
+            for col in cols_to_fill:
+                row[col] = get_imputed_value(row, col)
+            return row
+        
+        # Impute nulls
+        dataset = dataset.apply(row_mode_imputer, axis=1)
+
+        # Outliers treatment
+        def outliers_capping(df):
+            for col in df.select_dtypes(include='number').columns:
+                data_mean, data_std = df[col].mean(), df[col].std()
+                cutoff = 3 * data_std
+                lower, upper = data_mean - cutoff, data_mean + cutoff
+                df[col] = df[col].apply(lambda x: lower if x < lower else (upper if x > upper else x))
+
+            return df
+        
+        dataset = outliers_capping(dataset)
+
+        # Encoding RainToday and RainTomorrow
+        encode_yes_no = lambda x: int(x == "Yes")
+        dataset["RainToday"] = dataset["RainToday"].apply(encode_yes_no)
+        dataset["RainTomorrow"] = dataset["RainTomorrow"].apply(encode_yes_no)
+
+        # Encoding wind dir
+        dir_to_degree = {
+            'N': 0, 'NNE': 22.5, 'NE': 45, 'ENE': 67.5, 'E': 90, 'ESE': 112.5,
+            'SE': 135, 'SSE': 157.5, 'S': 180, 'SSW': 202.5, 'SW': 225, 'WSW': 247.5,
+            'W': 270, 'WNW': 292.5, 'NW': 315, 'NNW': 337.5
+        }
+
+        dir_variables = ["WindGustDir", "WindDir9am", "WindDir3pm"]
+
+        for dir_var in dir_variables:
+            dataset[dir_var] = dataset[dir_var].map(dir_to_degree)
+            dataset[f'{dir_var}_sin'] = np.sin(np.deg2rad(dataset[dir_var]))
+            dataset[f'{dir_var}_cos'] = np.cos(np.deg2rad(dataset[dir_var]))
+            dataset.drop(columns=[dir_var], inplace=True)
+
+        # Encoding Location
+        coordinates = {
+            'Albury': (-36.0804766, 146.9162795), 
+            'BadgerysCreek': (-33.8816671, 150.7441627), 
+            'Cobar': (-31.4983333, 145.8344444), 
+            'CoffsHarbour': (-30.2985996, 153.1094116), 
+            'Moree': (-29.4617202, 149.8407153), 
+            'Newcastle': (-32.9272881, 151.7812534), 
+            'NorahHead': (-33.2816667, 151.5677778), 
+            'NorfolkIsland': (-29.0328038, 167.9483137), 
+            'Penrith': (-33.74779624999999, 150.71478824217297), 
+            'Richmond': (-37.80745, 144.99071761295892), 
+            'Sydney': (-33.8698439, 151.2082848), 
+            'SydneyAirport': (-33.9498935, 151.18196819346016), 
+            'WaggaWagga': (-35.115, 147.3677778), 
+            'Williamtown': (-32.815, 151.8427778), 
+            'Wollongong': (-34.4243941, 150.89385), 
+            'Canberra': (-35.2975906, 149.1012676), 
+            'Tuggeranong': (-35.4209771, 149.0921341), 
+            'MountGinini': (-35.5297437, 148.7725396), 
+            'Ballarat': (-37.5623013, 143.8605645), 
+            'Bendigo': (-36.7590183, 144.2826718), 
+            'Sale': (-38.1094463, 147.0656717), 
+            'MelbourneAirport': (-37.6667554, 144.8288501411705), 
+            'Melbourne': (-37.8142454, 144.9631732), 
+            'Mildura': (-34.195274, 142.1503146), 
+            'Nhil': (-35.4713087, 141.3062355), 
+            'Portland': (-38.3456231, 141.6042304), 
+            'Watsonia': (-37.7109468, 145.0837808), 
+            'Dartmoor': (-27.996161999999998, 115.18921814168053), 
+            'Brisbane': (-27.4689682, 153.0234991), 
+            'Cairns': (-16.9206657, 145.7721854), 
+            'GoldCoast': (-28.0805, 153.4309186971459), 
+            'Townsville': (-19.2569391, 146.8239537), 
+            'Adelaide': (-34.9281805, 138.5999312), 
+            'MountGambier': (-37.8246698, 140.78195963207457), 
+            'Nuriootpa': (-34.4693354, 138.9939006), 
+            'Woomera': (-31.1999142, 136.8253532), 
+            'Albany': (-35.0247822, 117.883608), 
+            'Witchcliffe': (-34.0263348, 115.1004768), 
+            'PearceRAAF': (-31.6739604, 116.01754351808195), 
+            'PerthAirport': (-31.9406095, 115.96760765137932), 
+            'Perth': (-31.9558933, 115.8605855), 
+            'SalmonGums': (-32.9815167, 121.6440785), 
+            'Walpole': (-34.9776796, 116.7310063), 
+            'Hobart': (-42.8825088, 147.3281233), 
+            'Launceston': (-41.4340813, 147.1373496), 
+            'AliceSprings': (-23.6983884, 133.8812885), 
+            'Darwin': (-12.46044, 130.8410469), 
+            'Katherine': (-14.4646157, 132.2635993), 
+            'Uluru': (-25.3455545, 131.03696147470208)
+        }
+
+        dataset[['Latitude', 'Longitude']] = dataset['Location'].apply(lambda x: pd.Series(coordinates[x]))
+        dataset.drop(columns=['Location'], inplace=True)
+
+        # Encoding Season
+        season_to_degree = {'Winter': 0, 'Spring': 90, 'Summer': 180, 'Fall': 270}
+        dataset['SeasonDegree'] = dataset['Season'].map(season_to_degree)
+        dataset['Season_sin'] = np.sin(np.deg2rad(dataset['SeasonDegree']))
+        dataset['Season_cos'] = np.cos(np.deg2rad(dataset['SeasonDegree']))
+        dataset.drop(columns=["Season"], inplace=True)
+        dataset.drop(columns=["SeasonDegree"], inplace=True)
+
+        data_end_path = "s3://data/raw/weatherAUS_transformed.csv"
+        wr.s3.to_csv(df=dataset,
                      path=data_end_path,
                      index=False)
 
@@ -125,19 +256,17 @@ def process_etl_heart_data():
                 # Something else has gone wrong.
                 raise e
 
-        target_col = Variable.get("target_col_heart")
-        dataset_log = dataset.drop(columns=target_col)
-        dataset_with_dummies_log = dataset_with_dummies.drop(columns=target_col)
+        target_col = Variable.get("target_col")
+        dataset_log = original_dataset.drop(columns=target_col)
+        dataset_processed_log = dataset.drop(columns=target_col)
 
         # Upload JSON String to an S3 Object
         data_dict['columns'] = dataset_log.columns.to_list()
-        data_dict['columns_after_dummy'] = dataset_with_dummies_log.columns.to_list()
+        data_dict['columns_after_transform'] = dataset_processed_log.columns.to_list()
         data_dict['target_col'] = target_col
         data_dict['categorical_columns'] = categories_list
         data_dict['columns_dtypes'] = {k: str(v) for k, v in dataset_log.dtypes.to_dict().items()}
-        data_dict['columns_dtypes_after_dummy'] = {k: str(v) for k, v in dataset_with_dummies_log.dtypes
-                                                                                                 .to_dict()
-                                                                                                 .items()}
+        data_dict['columns_dtypes_after_transform'] = {k: str(v) for k, v in dataset_processed_log.dtypes.to_dict().items()}
 
         category_dummies_dict = {}
         for category in categories_list:
@@ -154,24 +283,25 @@ def process_etl_heart_data():
             Body=data_string
         )
 
+        # Log the processed dataset to MLflow
         mlflow.set_tracking_uri('http://mlflow:5000')
-        experiment = mlflow.set_experiment("Heart Disease")
+        experiment = mlflow.set_experiment("Rain in Australia")
 
         mlflow.start_run(run_name='ETL_run_' + datetime.datetime.today().strftime('%Y/%m/%d-%H:%M:%S"'),
                          experiment_id=experiment.experiment_id,
-                         tags={"experiment": "etl", "dataset": "Heart disease"},
+                         tags={"experiment": "etl", "dataset": "Rain in Australia"},
                          log_system_metrics=True)
 
-        mlflow_dataset = mlflow.data.from_pandas(dataset,
-                                                 source="https://archive.ics.uci.edu/dataset/45/heart+disease",
-                                                 targets=target_col,
-                                                 name="heart_data_complete")
-        mlflow_dataset_dummies = mlflow.data.from_pandas(dataset_with_dummies,
-                                                         source="https://archive.ics.uci.edu/dataset/45/heart+disease",
-                                                         targets=target_col,
-                                                         name="heart_data_complete_with_dummies")
-        mlflow.log_input(mlflow_dataset, context="Dataset")
-        mlflow.log_input(mlflow_dataset_dummies, context="Dataset")
+        mlflow_original_dataset = mlflow.data.from_pandas(original_dataset,
+                                                          source="https://www.kaggle.com/datasets/jsphyg/weather-dataset-rattle-package",
+                                                          targets=target_col,
+                                                          name="weather_data_complete")
+        mlflow_transformed_dataset = mlflow.data.from_pandas(dataset,
+                                                             source="https://www.kaggle.com/datasets/jsphyg/weather-dataset-rattle-package",
+                                                             targets=target_col,
+                                                             name="weather_data_transformed")
+        mlflow.log_input(mlflow_original_dataset, context="Dataset")
+        mlflow.log_input(mlflow_transformed_dataset, context="Dataset")
 
     @task.virtualenv(
         task_id="split_dataset",
@@ -192,11 +322,11 @@ def process_etl_heart_data():
                          path=path,
                          index=False)
 
-        data_original_path = "s3://data/raw/heart_dummies.csv"
+        data_original_path = "s3://data/raw/weatherAUS_transformed.csv"
         dataset = wr.s3.read_csv(data_original_path)
 
-        test_size = Variable.get("test_size_heart")
-        target_col = Variable.get("target_col_heart")
+        test_size = Variable.get("test_size")
+        target_col = Variable.get("target_col")
 
         X = dataset.drop(columns=target_col)
         y = dataset[[target_col]]
@@ -206,10 +336,10 @@ def process_etl_heart_data():
         # Clean duplicates
         dataset.drop_duplicates(inplace=True, ignore_index=True)
 
-        save_to_csv(X_train, "s3://data/final/train/heart_X_train.csv")
-        save_to_csv(X_test, "s3://data/final/test/heart_X_test.csv")
-        save_to_csv(y_train, "s3://data/final/train/heart_y_train.csv")
-        save_to_csv(y_test, "s3://data/final/test/heart_y_test.csv")
+        save_to_csv(X_train, "s3://data/final/train/weatherAUS_X_train.csv")
+        save_to_csv(X_test, "s3://data/final/test/weatherAUS_X_test.csv")
+        save_to_csv(y_train, "s3://data/final/train/weatherAUS_y_train.csv")
+        save_to_csv(y_test, "s3://data/final/test/weatherAUS_y_test.csv")
 
     @task.virtualenv(
         task_id="normalize_numerical_features",
@@ -237,8 +367,8 @@ def process_etl_heart_data():
                          path=path,
                          index=False)
 
-        X_train = wr.s3.read_csv("s3://data/final/train/heart_X_train.csv")
-        X_test = wr.s3.read_csv("s3://data/final/test/heart_X_test.csv")
+        X_train = wr.s3.read_csv("s3://data/final/train/weatherAUS_X_train.csv")
+        X_test = wr.s3.read_csv("s3://data/final/test/weatherAUS_X_test.csv")
 
         sc_X = StandardScaler(with_mean=True, with_std=True)
         X_train_arr = sc_X.fit_transform(X_train)
@@ -247,8 +377,8 @@ def process_etl_heart_data():
         X_train = pd.DataFrame(X_train_arr, columns=X_train.columns)
         X_test = pd.DataFrame(X_test_arr, columns=X_test.columns)
 
-        save_to_csv(X_train, "s3://data/final/train/heart_X_train.csv")
-        save_to_csv(X_test, "s3://data/final/test/heart_X_test.csv")
+        save_to_csv(X_train, "s3://data/final/train/weatherAUS_X_train.csv")
+        save_to_csv(X_test, "s3://data/final/test/weatherAUS_X_test.csv")
 
         # Save information of the dataset
         client = boto3.client('s3')
@@ -259,8 +389,8 @@ def process_etl_heart_data():
             text = result["Body"].read().decode()
             data_dict = json.loads(text)
         except botocore.exceptions.ClientError as e:
-                # Something else has gone wrong.
-                raise e
+            # Something else has gone wrong.
+            raise e
 
         # Upload JSON String to an S3 Object
         data_dict['standard_scaler_mean'] = sc_X.mean_.tolist()
@@ -274,7 +404,7 @@ def process_etl_heart_data():
         )
 
         mlflow.set_tracking_uri('http://mlflow:5000')
-        experiment = mlflow.set_experiment("Heart Disease")
+        experiment = mlflow.set_experiment("Rain in Australia")
 
         # Obtain the last experiment run_id to log the new information
         list_run = mlflow.search_runs([experiment.experiment_id], output_format="list")
@@ -288,7 +418,7 @@ def process_etl_heart_data():
             mlflow.log_param("Standard Scaler scale values", sc_X.scale_)
 
 
-    get_data() >> make_dummies_variables() >> split_dataset() >> normalize_data()
+    get_data() >> transform_data() >> split_dataset() >> normalize_data()
 
 
-dag = process_etl_heart_data()
+dag = process_etl_rain_in_australia_data()
