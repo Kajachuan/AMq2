@@ -19,7 +19,7 @@ default_args = {
     'schedule_interval': None,
     'retries': 1,
     'retry_delay': datetime.timedelta(minutes=5),
-    'dagrun_timeout': datetime.timedelta(minutes=15)
+    'dagrun_timeout': datetime.timedelta(minutes=60)
 }
 
 
@@ -270,7 +270,7 @@ def process_etl_rain_in_australia_data():
 
         category_dummies_dict = {}
         for category in categories_list:
-            category_dummies_dict[category] = np.sort(dataset_log[category].unique()).tolist()
+            category_dummies_dict[category] = np.sort(dataset_log[category].dropna().unique()).tolist()
 
         data_dict['categories_values_per_categorical'] = category_dummies_dict
 
