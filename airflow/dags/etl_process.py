@@ -16,7 +16,6 @@ testing. The split between the training and testing datasets is 85/15 and they a
 default_args = {
     'owner': "Kevin Cajachuán, Augusto Doffo, Daniel Herrera",
     'depends_on_past': False,
-    'schedule_interval': None,
     'retries': 1,
     'retry_delay': datetime.timedelta(minutes=5),
     'dagrun_timeout': datetime.timedelta(minutes=60)
@@ -25,11 +24,14 @@ default_args = {
 
 @dag(
     dag_id="process_etl_rain_in_australia_data",
-    description="ETL process for rain in Australia data, separating the dataset into training and testing sets.",
+    description="ETL process for Rain in Australia data, separating the dataset into training and testing sets.",
     doc_md=markdown_text,
     tags=["ETL", "Rain in Australia"],
     default_args=default_args,
     catchup=False,
+    schedule_interval='0 0 1 * *', # Primer día de cada mes a las 0:00
+    start_date=datetime.datetime(2024, 9, 1),
+    is_paused_upon_creation=False # Se ejecuta el dag en la creación
 )
 def process_etl_rain_in_australia_data():
 

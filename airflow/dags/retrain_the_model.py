@@ -3,17 +3,16 @@ import datetime
 from airflow.decorators import dag, task
 
 markdown_text = """
-### Re-Train the Model for Heart Disease Data
+### Re-Train the Model for Rain in Australia Data
 
 This DAG re-trains the model based on new data, tests the previous model, and put in production the new one 
-if it performs  better than the old one. It uses the F1 score to evaluate the model with the test data.
+if it performs better than the old one. It uses the F1 score to evaluate the model with the test data.
 
 """
 
 default_args = {
-    'owner': "Facundo Adrian Lucianna",
+    'owner': "Kevin Cajachuán, Augusto Doffo, Daniel Herrera",
     'depends_on_past': False,
-    'schedule_interval': None,
     'retries': 1,
     'retry_delay': datetime.timedelta(minutes=5),
     'dagrun_timeout': datetime.timedelta(minutes=15)
@@ -24,9 +23,12 @@ default_args = {
     description="Re-train the model based on new data, tests the previous model, and put in production the new one if "
                 "it performs better than the old one",
     doc_md=markdown_text,
-    tags=["Re-Train", "Heart Disease"],
+    tags=["Re-Train", "Rain in Australia"],
     default_args=default_args,
     catchup=False,
+    schedule_interval='0 1 1 * *', # Primer día de cada mes a la 1:00, para esperar el ETL.
+    start_date=datetime.datetime(2024, 9, 1),
+    is_paused_upon_creation=True
 )
 def processing_dag():
 
@@ -50,7 +52,7 @@ def processing_dag():
 
         def load_the_champion_model():
 
-            model_name = "heart_disease_model_prod"
+            model_name = "rain_in_australia_model_prod"
             alias = "champion"
 
             client = mlflow.MlflowClient()
@@ -61,21 +63,21 @@ def processing_dag():
             return champion_version
 
         def load_the_train_test_data():
-            X_train = wr.s3.read_csv("s3://data/final/train/heart_X_train.csv")
-            y_train = wr.s3.read_csv("s3://data/final/train/heart_y_train.csv")
-            X_test = wr.s3.read_csv("s3://data/final/test/heart_X_test.csv")
-            y_test = wr.s3.read_csv("s3://data/final/test/heart_y_test.csv")
+            X_train = wr.s3.read_csv("s3://data/final/train/weatherAUS_X_train.csv")
+            y_train = wr.s3.read_csv("s3://data/final/train/weatherAUS_y_train.csv")
+            X_test = wr.s3.read_csv("s3://data/final/test/weatherAUS_X_test.csv")
+            y_test = wr.s3.read_csv("s3://data/final/test/weatherAUS_y_test.csv")
 
             return X_train, y_train, X_test, y_test
 
         def mlflow_track_experiment(model, X):
 
             # Track the experiment
-            experiment = mlflow.set_experiment("Heart Disease")
+            experiment = mlflow.set_experiment("Rain in Australia")
 
             mlflow.start_run(run_name='Challenger_run_' + datetime.datetime.today().strftime('%Y/%m/%d-%H:%M:%S"'),
                              experiment_id=experiment.experiment_id,
-                             tags={"experiment": "challenger models", "dataset": "Heart disease"},
+                             tags={"experiment": "challenger models", "dataset": "Rain in Australia"},
                              log_system_metrics=True)
 
             params = model.get_params()
@@ -93,7 +95,7 @@ def processing_dag():
                 artifact_path=artifact_path,
                 signature=signature,
                 serialization_format='cloudpickle',
-                registered_model_name="heart_disease_model_dev",
+                registered_model_name="rain_in_australia_model_dev",
                 metadata={"model_data_version": 1}
             )
 
@@ -103,7 +105,7 @@ def processing_dag():
         def register_challenger(model, f1_score, model_uri):
 
             client = mlflow.MlflowClient()
-            name = "heart_disease_model_prod"
+            name = "rain_in_australia_model_prod"
 
             # Save the model params as tags
             tags = model.get_params()
@@ -160,7 +162,7 @@ def processing_dag():
         mlflow.set_tracking_uri('http://mlflow:5000')
 
         def load_the_model(alias):
-            model_name = "heart_disease_model_prod"
+            model_name = "rain_in_australia_model_prod"
 
             client = mlflow.MlflowClient()
             model_data = client.get_model_version_by_alias(model_name, alias)
@@ -170,8 +172,8 @@ def processing_dag():
             return model
 
         def load_the_test_data():
-            X_test = wr.s3.read_csv("s3://data/final/test/heart_X_test.csv")
-            y_test = wr.s3.read_csv("s3://data/final/test/heart_y_test.csv")
+            X_test = wr.s3.read_csv("s3://data/final/test/weatherAUS_X_test.csv")
+            y_test = wr.s3.read_csv("s3://data/final/test/weatherAUS_y_test.csv")
 
             return X_test, y_test
 
@@ -214,7 +216,7 @@ def processing_dag():
         y_pred_challenger = challenger_model.predict(X_test)
         f1_score_challenger = f1_score(y_test.to_numpy().ravel(), y_pred_challenger)
 
-        experiment = mlflow.set_experiment("Heart Disease")
+        experiment = mlflow.set_experiment("Rain in Australia")
 
         # Obtain the last experiment run_id to log the new information
         list_run = mlflow.search_runs([experiment.experiment_id], output_format="list")
@@ -228,7 +230,7 @@ def processing_dag():
             else:
                 mlflow.log_param("Winner", 'Champion')
 
-        name = "heart_disease_model_prod"
+        name = "rain_in_australia_model_prod"
         if f1_score_challenger > f1_score_champion:
             promote_challenger(name)
         else:
