@@ -85,11 +85,14 @@ def process_etl_rain_in_australia_data():
 
         dataset = original_dataset.copy()
 
+        target_col = Variable.get("target_col")
+
         # Drop rows with null target
-        dataset = dataset.dropna(subset='RainTomorrow')
+        dataset = dataset.dropna(subset=target_col)
 
         # Get categorical features
         categories_list = dataset.select_dtypes(include=['object']).columns.tolist()
+        categories_list.remove(target_col)
 
         # Separate Date fields
         def get_season(date):
@@ -258,7 +261,6 @@ def process_etl_rain_in_australia_data():
                 # Something else has gone wrong.
                 raise e
 
-        target_col = Variable.get("target_col")
         dataset_log = original_dataset.drop(columns=target_col)
         dataset_processed_log = dataset.drop(columns=target_col)
 
@@ -269,14 +271,18 @@ def process_etl_rain_in_australia_data():
         data_dict['categorical_columns'] = categories_list
         data_dict['columns_dtypes'] = {k: str(v) for k, v in dataset_log.dtypes.to_dict().items()}
         data_dict['columns_dtypes_after_transform'] = {k: str(v) for k, v in dataset_processed_log.dtypes.to_dict().items()}
+        data_dict['wind_dir_columns'] = dir_variables
+        data_dict['wind_dir_degrees'] = dir_to_degree
+        data_dict['city_coordinates'] = coordinates
+        data_dict['season_degrees'] = season_to_degree
 
-        category_dummies_dict = {}
+        category_values_dict = {}
         for category in categories_list:
-            category_dummies_dict[category] = np.sort(dataset_log[category].dropna().unique()).tolist()
+            category_values_dict[category] = np.sort(dataset_log[category].dropna().unique()).tolist()
 
-        data_dict['categories_values_per_categorical'] = category_dummies_dict
+        data_dict['categories_values_per_categorical'] = category_values_dict
 
-        data_dict['date'] = datetime.datetime.today().strftime('%Y/%m/%d-%H:%M:%S"')
+        data_dict['date'] = datetime.datetime.today().strftime('%Y/%m/%d-%H:%M:%S')
         data_string = json.dumps(data_dict, indent=2)
 
         client.put_object(
@@ -289,7 +295,7 @@ def process_etl_rain_in_australia_data():
         mlflow.set_tracking_uri('http://mlflow:5000')
         experiment = mlflow.set_experiment("Rain in Australia")
 
-        mlflow.start_run(run_name='ETL_run_' + datetime.datetime.today().strftime('%Y/%m/%d-%H:%M:%S"'),
+        mlflow.start_run(run_name='ETL_run_' + datetime.datetime.today().strftime('%Y/%m/%d-%H:%M:%S'),
                          experiment_id=experiment.experiment_id,
                          tags={"experiment": "etl", "dataset": "Rain in Australia"},
                          log_system_metrics=True)

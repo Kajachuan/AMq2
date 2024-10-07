@@ -1,8 +1,6 @@
-import mlflow 
-
-from sklearn.svm import SVC 
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
+import mlflow
+import catboost as cb
+import xgboost as xgb
 from sklearn.model_selection import cross_val_score
 
 
@@ -59,53 +57,46 @@ def objective(trial, X_train, y_train, experiment_id):
         }
 
         # Sugiere valores para los hiperparámetros utilizando el objeto trial de optuna.
-        classifier_name = trial.suggest_categorical('classifier', ['SVC_linear', 
-                                                                   'SVC_poly', 
-                                                                   'SVC_rbf',
-                                                                   'DecisionTreeClassifier', 
-                                                                   'RandomForest'])
-        if 'SVC' in classifier_name:
-            # Support Vector Classifier (SVC)
-            params["model"] = "SVC"
-            svc_c = trial.suggest_float('svc_c', 0.01, 100, log=True) # Parámetro de regularización
-            kernel = 'linear'
-            degree = 3
+        classifier_name = trial.suggest_categorical('classifier', ['CatBoost', 
+                                                                   'XGBoost'])
+        
+        if classifier_name == 'CatBoost':
+            # CatBoost
+            params["model"] = "CatBoost"
 
-            if classifier_name == 'SVC_poly':
-                # Si un kernel polinomial es elegido
-                degree = trial.suggest_int('svc_poly_degree', 2, 6) # Grado del polinomio
-                kernel = 'poly'
-                params["degree"] = degree
-            elif classifier_name == 'SVC_rbf':
-                # Si un kernel de función radial es elegido
-                kernel = 'rbf'
+            iterations = trial.suggest_int('iterations', 100, 2000, step=100)
+            learning_rate = trial.suggest_float('learning_rate', 0.01, 0.3, step=0.01)
+            depth = trial.suggest_int('depth', 4, 10)
 
-            params["kernel"] = kernel
-            params["C"] = svc_c
-            
-            # Crea un clasificador SVM con los parámetros establecidos
-            classifier_obj = SVC(C=svc_c, kernel=kernel, gamma='scale', degree=degree)
+            params["iterations"] = iterations
+            params["learning_rate"] = learning_rate
+            params["depth"] = depth
 
-        elif classifier_name == 'DecisionTreeClassifier':
-            # Decision Tree Classifier
-            tree_max_depth = trial.suggest_int("tree_max_depth", 2, 32, log=True) # Máxima profundidad del arbol
-
-            classifier_obj = DecisionTreeClassifier(max_depth=tree_max_depth) 
-
-            params["model"] = "DecisionTreeClassifier"
-            params["max_depth"] = tree_max_depth
-
+            classifier_obj = cb.CatBoostClassifier(
+                random_state=42, 
+                logging_level='Silent', 
+                iterations=iterations,
+                learning_rate=learning_rate,
+                depth=depth)
         else:
-            # Random Forest Classifier
-            rf_max_depth = trial.suggest_int("rf_max_depth", 2, 32, log=True) # Máxima profundidad de los arboles
-            rf_n_estimators = trial.suggest_int("rf_n_estimators", 2, 10, log=True) # Número de arboles
+            # XGBoost
+            params["model"] = "XGBoost"
 
-            classifier_obj = RandomForestClassifier(max_depth=rf_max_depth, 
-                                                    n_estimators=rf_n_estimators)
-            
-            params["model"] = "RandomForestClassifier"
-            params["max_depth"] = rf_max_depth
-            params["n_estimators"] = rf_n_estimators
+            n_estimators = trial.suggest_int('n_estimators', 100, 1200, step=100)
+            learning_rate = trial.suggest_float('learning_rate', 0.01, 0.3, step=0.01)
+            max_depth = trial.suggest_int('max_depth', 3, 10)
+
+            params["n_estimators"] = n_estimators
+            params["learning_rate"] = learning_rate
+            params["max_depth"] = max_depth
+
+            classifier_obj = xgb.XGBClassifier(
+                objective='binary:logistic', 
+                random_state=42, 
+                n_jobs=-1,
+                n_estimators=n_estimators,
+                learning_rate=learning_rate,
+                max_depth=max_depth)
         
         # Realizamos validación cruzada y calculamos el score F1
         score = cross_val_score(classifier_obj, X_train, y_train.to_numpy().ravel(), 

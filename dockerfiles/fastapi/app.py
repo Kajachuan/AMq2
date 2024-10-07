@@ -2,6 +2,7 @@ import json
 import pickle
 import boto3
 import mlflow
+import datetime
 
 import numpy as np
 import pandas as pd
@@ -77,7 +78,7 @@ def check_model():
     global version_model
 
     try:
-        model_name = "heart_disease_model_prod"
+        model_name = "rain_in_australia_model_prod"
         alias = "champion"
 
         mlflow.set_tracking_uri('http://mlflow:5000')
@@ -99,91 +100,137 @@ def check_model():
 
 class ModelInput(BaseModel):
     """
-    Input schema for the heart disease prediction model.
+    Input schema for the rain in Australia prediction model.
 
-    This class defines the input fields required by the heart disease prediction model along with their descriptions
+    This class defines the input fields required by the rain in Australia prediction model along with their descriptions
     and validation constraints.
 
-    :param age: Age of the patient (0 to 150).
-    :param sex: Sex of the patient. 1: male; 0: female.
-    :param cp: Chest pain type. 1: typical angina; 2: atypical angina; 3: non-anginal pain; 4: asymptomatic.
-    :param trestbps: Resting blood pressure in mm Hg on admission to the hospital (90 to 220).
-    :param chol: Serum cholestoral in mg/dl (110 to 600).
-    :param fbs: Fasting blood sugar. 1: >120 mg/dl; 0: <120 mg/dl.
-    :param restecg: Resting electrocardiographic results. 0: normal; 1: having ST-T wave abnormality; 2: showing
-                    probable or definite left ventricular hypertrophy.
-    :param thalach: Maximum heart rate achieved (beats per minute) (50 to 210).
-    :param exang: Exercise induced angina. 1: yes; 0: no.
-    :param oldpeak: ST depression induced by exercise relative to rest (0.0 to 7.0).
-    :param slope: The slope of the peak exercise ST segment. 1: upsloping; 2: flat; 3: downsloping.
-    :param ca: Number of major vessels colored by flourosopy (0 to 3).
-    :param thal: Thalassemia disease. 3: normal; 6: fixed defect; 7: reversable defect.
+    :param Date: The date of observation
+    :param Location: The common name of the location of the weather station
+    :param MinTemp: The minimum temperature in degrees celsius
+    :param MaxTemp: The maximum temperature in degrees celsius
+    :param Rainfall: The amount of rainfall recorded for the day in mm
+    :param Evaporation: The so-called Class A pan evaporation (mm) in the 24 hours to 9am
+    :param Sunshine: The number of hours of bright sunshine in the day.
+    :param WindGustDir: The direction of the strongest wind gust in the 24 hours to midnight
+    :param WindGustSpeed: The speed (km/h) of the strongest wind gust in the 24 hours to midnight
+    :param WindDir9am: Direction of the wind at 9am
+    :param WindDir3pm: Direction of the wind at 3pm
+    :param WindSpeed9am: Wind speed (km/hr) averaged over 10 minutes prior to 9am
+    :param WindSpeed3pm: Wind speed (km/hr) averaged over 10 minutes prior to 3pm
+    :param Humidity9am: Humidity (percent) at 9am
+    :param Humidity3pm: Humidity (percent) at 3pm
+    :param Pressure9am: Atmospheric pressure (hpa) reduced to mean sea level at 9am
+    :param Pressure3pm: Atmospheric pressure (hpa) reduced to mean sea level at 3pm
+    :param Cloud9am: Fraction of sky obscured by cloud at 9am. This is measured in "oktas", which are a unit of eigths. It records how many eigths of the sky are obscured by cloud. A 0 measure indicates completely clear sky whilst an 8 indicates that it is completely overcast.
+    :param Cloud3pm: Fraction of sky obscured by cloud (in "oktas": eighths) at 3pm. See Cload9am for a description of the values
+    :param Temp9am: Temperature (degrees C) at 9am
+    :param Temp3pm: Temperature (degrees C) at 3pm
+    :param RainToday: Boolean: True if precipitation (mm) in the 24 hours to 9am exceeds 1mm, otherwise False
     """
 
-    age: int = Field(
-        description="Age of the patient",
+    Date: datetime.date = Field(
+        description="The date of observation",
+    )
+    Location: str = Field(
+        description="The common name of the location of the weather station",
+    )
+    MinTemp: float = Field(
+        description="The minimum temperature in degrees celsius",
+        ge=-10,
+        le=55,
+    )
+    MaxTemp: float = Field(
+        description="The maximum temperature in degrees celsius",
+        ge=-10,
+        le=55,
+    )
+    Rainfall: float = Field(
+        description="The amount of rainfall recorded for the day in mm",
         ge=0,
-        le=150,
+        le=400,
     )
-    sex: int = Field(
-        description="Sex of the patient. 1: male; 0: female",
+    Evaloration: float = Field(
+        description="The so-called Class A pan evaporation (mm) in the 24 hours to 9am",
         ge=0,
-        le=1,
+        le=200,
     )
-    cp: int = Field(
-        description="Chest pain type. 1: typical angina; 2: atypical angina, 3: non-anginal pain; 4: asymptomatic",
-        ge=1,
-        le=4,
-    )
-    trestbps: float = Field(
-        description="Resting blood pressure in mm Hg on admission to the hospital",
-        ge=90,
-        le=220,
-    )
-    chol: float = Field(
-        description="Serum cholestoral in mg/dl",
-        ge=110,
-        le=600,
-    )
-    fbs: int = Field(
-        description="Fasting blood sugar. 1: >120 mg/dl; 0: <120 mg/dl",
+    Sunshine: float = Field(
+        description="The number of hours of bright sunshine in the day.",
         ge=0,
-        le=1,
+        le=24,
     )
-    restecg: int = Field(
-        description="Resting electrocardiographic results. 0: normal; 1:  having ST-T wave abnormality (T wave "
-                    "inversions and/or ST elevation or depression of > 0.05 mV), 2: showing probable or definite "
-                    "left ventricular hypertrophy by Estes' criteria",
-        ge=0,
-        le=2,
-    )
-    thalach: float = Field(
-        description="Maximum heart rate achieved (beats per minute)",
+    WindGustDir: str = Field(
+        description="The direction of the strongest wind gust in the 24 hours to midnight",
         ge=50,
         le=210,
     )
-    exang: int = Field(
-        description="Exercise induced angina. 1: yes; 0: no",
+    WindGustSpeed: float = Field(
+        description="The speed (km/h) of the strongest wind gust in the 24 hours to midnight",
         ge=0,
-        le=1,
+        le=200,
     )
-    oldpeak: float = Field(
-        description="ST depression induced by exercise relative to rest",
-        ge=0.0,
-        le=7.0,
+    WindDir9am: str = Field(
+        description="Direction of the wind at 9am",
     )
-    slope: int = Field(
-        description="The slope of the peak exercise ST segment .1: upsloping; 2: flat, 3: downsloping",
-        ge=1,
-        le=3,
+    WindDir3pm: str = Field(
+        description="Direction of the wind at 3pm",
     )
-    ca: int = Field(
-        description="Number of major vessels colored by flourosopy",
+    WindSpeed9am: float = Field(
+        description="Wind speed (km/hr) averaged over 10 minutes prior to 9am",
         ge=0,
-        le=3,
+        le=200,
     )
-    thal: Literal[3, 6, 7] = Field(
-        description="Thalassemia disease. 3: normal; 6: fixed defect; 7: reversable defect",
+    WindSpeed3pm: float = Field(
+        description="Wind speed (km/hr) averaged over 10 minutes prior to 3pm",
+        ge=0,
+        le=200,
+    )
+    Humidity9am: float = Field(
+        description="Humidity (percent) at 9am",
+        ge=0,
+        le=100,
+    )
+    Humidity3pm: float = Field(
+        description="Humidity (percent) at 3pm",
+        ge=0,
+        le=100,
+    )
+    Pressure9am: float = Field(
+        description="Atmospheric pressure (hpa) reduced to mean sea level at 9am",
+        ge=850,
+        le=2000,
+    )
+    Pressure3pm: float = Field(
+        description="Atmospheric pressure (hpa) reduced to mean sea level at 3pm",
+        ge=850,
+        le=2000,
+    )
+    Cloud9am: int = Field(
+        description="Fraction of sky obscured by cloud at 9am. This is measured in \"oktas\", " + 
+        "which are a unit of eigths. It records how many eigths of the sky are obscured by cloud. " + 
+        "A 0 measure indicates completely clear sky whilst an 8 indicates that it is completely overcast.",
+        ge=0,
+        le=9,
+    )
+    Cloud3pm: int = Field(
+        description="Fraction of sky obscured by cloud (in \"oktas\": eighths) at 3pm." + 
+        "See Cload9am for a description of the values",
+        ge=0,
+        le=9,
+    )
+    Temp9am: float = Field(
+        description="Temperature (degrees C) at 9am",
+        ge=-10,
+        le=55,
+    )
+    Temp3pm: float = Field(
+        description="Temperature (degrees C) at 3pm",
+        ge=-10,
+        le=55,
+    )
+    RainToday: bool = Field(
+        description="Boolean: True if precipitation (mm) in the 24 hours to 9am exceeds 1mm, otherwise False",
     )
 
     model_config = {
@@ -211,19 +258,19 @@ class ModelInput(BaseModel):
 
 class ModelOutput(BaseModel):
     """
-    Output schema for the heart disease prediction model.
+    Output schema for the rain in Australia prediction model.
 
-    This class defines the output fields returned by the heart disease prediction model along with their descriptions
+    This class defines the output fields returned by the rain in Australia prediction model along with their descriptions
     and possible values.
 
-    :param int_output: Output of the model. True if the patient has a heart disease.
-    :param str_output: Output of the model in string form. Can be "Healthy patient" or "Heart disease detected".
+    :param int_output: Output of the model. True if it will rain tomorrow.
+    :param str_output: Output of the model in string form. Can be "It will rain tomorrow" or "It won't rain tomorrow".
     """
 
     int_output: bool = Field(
-        description="Output of the model. True if the patient has a heart disease",
+        description="Output of the model. True if it will rain tomorrow",
     )
-    str_output: Literal["Healthy patient", "Heart disease detected"] = Field(
+    str_output: Literal["It will rain tomorrow", "It won't rain tomorrow"] = Field(
         description="Output of the model in string form",
     )
 
@@ -232,7 +279,7 @@ class ModelOutput(BaseModel):
             "examples": [
                 {
                     "int_output": True,
-                    "str_output": "Heart disease detected",
+                    "str_output": "It will rain tomorrow",
                 }
             ]
         }
@@ -240,7 +287,7 @@ class ModelOutput(BaseModel):
 
 
 # Load the model before start
-model, version_model, data_dict = load_model("heart_disease_model_prod", "champion")
+model, version_model, data_dict = load_model("rain_in_australia_model_prod", "champion")
 
 app = FastAPI()
 
@@ -248,11 +295,11 @@ app = FastAPI()
 @app.get("/")
 async def read_root():
     """
-    Root endpoint of the Heart Disease Detector API.
+    Root endpoint of the Rain in Australia predictor API.
 
     This endpoint returns a JSON response with a welcome message to indicate that the API is running.
     """
-    return JSONResponse(content=jsonable_encoder({"message": "Welcome to the Heart Disease Detector API"}))
+    return JSONResponse(content=jsonable_encoder({"message": "Welcome to the Rain in Australia predictor API"}))
 
 
 @app.post("/predict/", response_model=ModelOutput)
@@ -264,9 +311,9 @@ def predict(
     background_tasks: BackgroundTasks
 ):
     """
-    Endpoint for predicting heart disease.
+    Endpoint for predicting rain in australia.
 
-    This endpoint receives features related to a patient's health and predicts whether the patient has heart disease
+    This endpoint receives features related to an Australian city weather and predicts whether it will rain on next day
     or not using a trained model. It returns the prediction result in both integer and string formats.
     """
 
@@ -277,19 +324,45 @@ def predict(
     # Convert features into a pandas DataFrame
     features_df = pd.DataFrame(np.array(features_list).reshape([1, -1]), columns=features_key)
 
-    # Process categorical features
-    for categorical_col in data_dict["categorical_columns"]:
-        features_df[categorical_col] = features_df[categorical_col].astype(int)
-        categories = data_dict["categories_values_per_categorical"][categorical_col]
-        features_df[categorical_col] = pd.Categorical(features_df[categorical_col], categories=categories)
+    # Define get season from date
+    def get_season(date):
+            month = date.month
+            if month in [12, 1, 2]:
+                return 'Summer'
+            elif month in [3, 4, 5]:
+                return 'Fall'
+            elif month in [6, 7, 8]:
+                return 'Winter'
+            elif month in [9, 10, 11]:
+                return 'Spring'
 
-    # Convert categorical features into dummy variables
-    features_df = pd.get_dummies(data=features_df,
-                                 columns=data_dict["categorical_columns"],
-                                 drop_first=True)
+    # Get data from date and encoding season
+    features_df['Date'] = pd.to_datetime(features_df['Date'])
+    features_df['Year'] = features_df['Date'].dt.year
+    features_df['Month'] = features_df['Date'].dt.month
+    features_df['Day'] = features_df['Date'].dt.day
+    features_df['Season'] = features_df['Date'].apply(get_season)
+    features_df.drop(columns='Date', inplace=True)
+
+    features_df['SeasonDegree'] = features_df['Season'].map(data_dict['season_degrees'])
+    features_df['Season_sin'] = np.sin(np.deg2rad(features_df['SeasonDegree']))
+    features_df['Season_cos'] = np.cos(np.deg2rad(features_df['SeasonDegree']))
+    features_df.drop(columns=["Season"], inplace=True)
+    features_df.drop(columns=["SeasonDegree"], inplace=True)
+
+    # Encode wind dir features
+    for dir_var in data_dict['wind_dir_columns']:
+        features_df[dir_var] = features_df[dir_var].map(data_dict['wind_dir_degrees'])
+        features_df[f'{dir_var}_sin'] = np.sin(np.deg2rad(features_df[dir_var]))
+        features_df[f'{dir_var}_cos'] = np.cos(np.deg2rad(features_df[dir_var]))
+        features_df.drop(columns=[dir_var], inplace=True)
+
+    # Get latitude and longitude from location
+    features_df[['Latitude', 'Longitude']] = features_df['Location'].apply(lambda x: pd.Series(data_dict['city_coordinates'][x]))
+    features_df.drop(columns=['Location'], inplace=True)
 
     # Reorder DataFrame columns
-    features_df = features_df[data_dict["columns_after_dummy"]]
+    features_df = features_df[data_dict["columns_after_transform"]]
 
     # Scale the data using standard scaler
     features_df = (features_df-data_dict["standard_scaler_mean"])/data_dict["standard_scaler_std"]
@@ -298,9 +371,9 @@ def predict(
     prediction = model.predict(features_df)
 
     # Convert prediction result into string format
-    str_pred = "Healthy patient"
+    str_pred = "It won't rain tomorrow"
     if prediction[0] > 0:
-        str_pred = "Heart disease detected"
+        str_pred = "It will rain tomorrow"
 
     # Check if the model has changed asynchronously
     background_tasks.add_task(check_model)
