@@ -300,6 +300,25 @@ services:
     volumes:
       - ${AIRFLOW_PROJ_DIR:-./airflow}:/sources
 
+  streamlit:
+    build: ./dockerfiles/streamlit
+    image: streamlit_app
+    container_name: streamlit_app
+    networks:
+      - amq2_frontend
+      - amq2_backend
+    depends_on:
+      - s3
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./streamlit:/app
+    environment:
+      - AWS_ACCESS_KEY_ID=minio
+      - AWS_SECRET_ACCESS_KEY=minio123
+      - AWS_ENDPOINT_URL_S3=http://s3:9000
+      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+
 networks:
   frontend:
     driver: bridge
