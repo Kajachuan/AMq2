@@ -57,8 +57,7 @@ def objective(trial, X_train, y_train, experiment_id):
         }
 
         # Sugiere valores para los hiperparámetros utilizando el objeto trial de optuna.
-        classifier_name = trial.suggest_categorical('classifier', ['CatBoost', 
-                                                                   'XGBoost'])
+        classifier_name = trial.suggest_categorical('classifier', ['CatBoost', 'XGBoost'])
         
         if classifier_name == 'CatBoost':
             # CatBoost

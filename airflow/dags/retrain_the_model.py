@@ -26,7 +26,7 @@ default_args = {
     tags=["Re-Train", "Rain in Australia"],
     default_args=default_args,
     catchup=False,
-    schedule_interval='0 1 1 * *', # Primer día de cada mes a la 1:00, para esperar el ETL.
+    schedule_interval='0 2 1 * *', # Primer día de cada mes a las 2:00, para esperar el ETL.
     start_date=datetime.datetime(2024, 9, 1),
     is_paused_upon_creation=True
 )

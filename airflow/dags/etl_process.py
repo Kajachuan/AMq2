@@ -31,7 +31,7 @@ default_args = {
     catchup=False,
     schedule_interval='0 0 1 * *', # Primer día de cada mes a las 0:00
     start_date=datetime.datetime(2024, 9, 1),
-    is_paused_upon_creation=False # Se ejecuta el dag en la creación
+    is_paused_upon_creation=True
 )
 def process_etl_rain_in_australia_data():
 
@@ -339,7 +339,7 @@ def process_etl_rain_in_australia_data():
         X = dataset.drop(columns=target_col)
         y = dataset[[target_col]]
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, stratify=y, random_state=42)
 
         # Clean duplicates
         dataset.drop_duplicates(inplace=True, ignore_index=True)
