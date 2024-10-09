@@ -23,7 +23,7 @@ ENV AWS_ENDPOINT_URL_S3=http://s3:9000
 ENV MLFLOW_S3_ENDPOINT_URL=http://s3:9000
 
 # Copiar el código de la aplicación Streamlit al contenedor
-COPY ../streamlit /app
+# COPY ../../streamlit /app
 
 # Exponer el puerto de Streamlit
 EXPOSE 8501

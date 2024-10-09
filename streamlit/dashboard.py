@@ -35,6 +35,7 @@ if 'data' in locals() and data is not None:
     # Contar la cantidad de observaciones por mes
     observations_per_month = data['Month'].value_counts().sort_index()
 
+    st.title('Rain Australia')
     # Graficar la cantidad de observaciones por mes
     st.title('Cantidad de Observaciones por Mes')
     st.bar_chart(observations_per_month)
