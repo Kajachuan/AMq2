@@ -14,7 +14,7 @@ testing. The split between the training and testing datasets is 85/15 and they a
 
 
 default_args = {
-    'owner': "Kevin Cajachuán, Augusto Doffo, Daniel Herrera",
+    'owner': "Kevin André Cajachuán Arroyo, Augusto Santiago Doffo, Daniel Fernando Herrera, Omar Victor Manuel Lopez Cabrera, Matías Alejandro Marando",
     'depends_on_past': False,
     'retries': 1,
     'retry_delay': datetime.timedelta(minutes=5),
@@ -30,7 +30,7 @@ default_args = {
     default_args=default_args,
     catchup=False,
     schedule_interval='0 0 1 * *', # Primer día de cada mes a las 0:00
-    start_date=datetime.datetime(2024, 9, 1),
+    start_date=datetime.datetime(2024, 10, 1),
     is_paused_upon_creation=True
 )
 def process_etl_rain_in_australia_data():
