@@ -150,7 +150,7 @@ class ModelInput(BaseModel):
         ge=0,
         le=400,
     )
-    Evaloration: float = Field(
+    Evaporation: float = Field(
         description="The so-called Class A pan evaporation (mm) in the 24 hours to 9am",
         ge=0,
         le=200,
@@ -162,8 +162,6 @@ class ModelInput(BaseModel):
     )
     WindGustDir: str = Field(
         description="The direction of the strongest wind gust in the 24 hours to midnight",
-        ge=50,
-        le=210,
     )
     WindGustSpeed: float = Field(
         description="The speed (km/h) of the strongest wind gust in the 24 hours to midnight",
@@ -237,19 +235,28 @@ class ModelInput(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "age": 67,
-                    "sex": 1,
-                    "cp": 4,
-                    "trestbps": 160.0,
-                    "chol": 286.0,
-                    "fbs": 0,
-                    "restecg": 2,
-                    "thalach": 108.0,
-                    "exang": 1,
-                    "oldpeak": 1.5,
-                    "slope": 2,
-                    "ca": 3,
-                    "thal": 3,
+                    "Date": "2024-01-01",
+                    "Location": "Albury",
+                    "MinTemp": 13.6,
+                    "MaxTemp": 28.3,
+                    "Rainfall": 2.6,
+                    "Evaporation": 3.5,
+                    "Sunshine": 5.2,
+                    "WindGustDir": "WNW",
+                    "WindGustSpeed": 44.3,
+                    "WindDir9am": "WNW",
+                    "WindDir3pm": "W",
+                    "WindSpeed9am": 41.9,
+                    "WindSpeed3pm": 43.5,
+                    "Humidity9am": 68.6,
+                    "Humidity3pm": 81.3,
+                    "Pressure9am": 1008,
+                    "Pressure3pm": 1007.6,
+                    "Cloud9am": 6,
+                    "Cloud3pm": 8,
+                    "Temp9am": 16.7,
+                    "Temp3pm": 25.6,
+                    "RainToday": False
                 }
             ]
         }
@@ -363,6 +370,9 @@ def predict(
 
     # Reorder DataFrame columns
     features_df = features_df[data_dict["columns_after_transform"]]
+
+    # Set correct dtypes
+    features_df = features_df.astype(data_dict["columns_dtypes_after_transform"])
 
     # Scale the data using standard scaler
     features_df = (features_df-data_dict["standard_scaler_mean"])/data_dict["standard_scaler_std"]
