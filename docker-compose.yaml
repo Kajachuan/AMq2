@@ -300,6 +300,34 @@ services:
     volumes:
       - ${AIRFLOW_PROJ_DIR:-./airflow}:/sources
 
+  streamlit:
+    restart: always
+    build: './dockerfiles/streamlit'
+    image: streamlit_app
+    container_name: streamlit_app
+    networks:
+      - frontend
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    environment:
+      - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:-minio}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY:-minio123}
+      - MLFLOW_S3_ENDPOINT_URL=http://s3:9000
+      - AWS_ENDPOINT_URL_S3=http://s3:9000
+    healthcheck:
+      test: curl --fail http://streamlit:8501/_stcore/health || exit 1
+      interval: 10s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    command: >
+      streamlit run home.py
+      --server.port=8501
+      --server.address=0.0.0.0
+
 networks:
   frontend:
     driver: bridge

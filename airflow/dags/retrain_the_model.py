@@ -11,7 +11,7 @@ if it performs better than the old one. It uses the F1 score to evaluate the mod
 """
 
 default_args = {
-    'owner': "Kevin Cajachuán, Augusto Doffo, Daniel Herrera",
+    'owner': "Kevin André Cajachuán Arroyo, Augusto Santiago Doffo, Daniel Fernando Herrera, Omar Victor Manuel Lopez Cabrera, Matías Alejandro Marando",
     'depends_on_past': False,
     'retries': 1,
     'retry_delay': datetime.timedelta(minutes=5),
@@ -26,8 +26,8 @@ default_args = {
     tags=["Re-Train", "Rain in Australia"],
     default_args=default_args,
     catchup=False,
-    schedule_interval='0 1 1 * *', # Primer día de cada mes a la 1:00, para esperar el ETL.
-    start_date=datetime.datetime(2024, 9, 1),
+    schedule_interval='0 2 1 * *', # Primer día de cada mes a las 2:00, para esperar el ETL.
+    start_date=datetime.datetime(2024, 10, 1),
     is_paused_upon_creation=True
 )
 def processing_dag():
@@ -36,7 +36,9 @@ def processing_dag():
         task_id="train_the_challenger_model",
         requirements=["scikit-learn==1.3.2",
                       "mlflow==2.10.2",
-                      "awswrangler==3.6.0"],
+                      "awswrangler==3.6.0",
+                      "xgboost==2.1.1",
+                      "catboost==1.2.7"],
         system_site_packages=True
     )
     def train_the_challenger_model():
@@ -147,10 +149,12 @@ def processing_dag():
 
 
     @task.virtualenv(
-        task_id="train_the_challenger_model",
+        task_id="evaluate_champion_challenge",
         requirements=["scikit-learn==1.3.2",
                       "mlflow==2.10.2",
-                      "awswrangler==3.6.0"],
+                      "awswrangler==3.6.0",
+                      "xgboost==2.1.1",
+                      "catboost==1.2.7"],
         system_site_packages=True
     )
     def evaluate_champion_challenge():
