@@ -41,11 +41,11 @@ se lleva a cabo siendo registrado en MLflow.
 
 - Ejecutar `docker compose` en el directorio raíz del repositorio: `docker compose --profile all up`
 
-- En **Airflow** verán dos DAGS:
+- En **Airflow** se verán dos DAGS:
     * `process_etl_rain_in_australia_data`
     * `retrain_the_model`
 
-- Ejecutar el DAG `*`process_etl_rain_in_australia_data`, de esta manera se crearán los datos en el bucket `s3://data`.
+- Ejecutar el DAG `process_etl_rain_in_australia_data`, de esta manera se crearán los datos en el bucket `s3://data`
 
 - Una vez finalizado, ejecutar la notebook `experiment_mlflow.ipynb`
 
@@ -56,13 +56,15 @@ se lleva a cabo siendo registrado en MLflow.
 - Verificar los datos generados en MinIO
 
 - Para probar el modelo:
-    * Ejecutar la notebook `fastapi.ipynb`
+    * Ejecutar la notebook `fastapi.ipynb` o
     * Ingresar al web server de **Streamlit**
-    * En la página *Dashboard*, en la pestaña *Predicciones*, podrá ingresar los datos y hacer una predicción de lluvia
+        * En la página *Dashboard*, en la pestaña *Predicciones*, ingresar los datos y hacer una predicción de lluvia
 
 - Para detener `docker compose` y eliminar todas las imágenes: `docker compose down --rmi all --volumes`
 
-Las URLs de los diferentes servicios son:
+
+### URLs de los servicios
+
 - Apache Airflow: http://localhost:8080
 - MLflow: http://localhost:5000
 - MinIO: http://localhost:9001
@@ -92,4 +94,4 @@ d0561c825747   mlflow                     Up 2 minutes (healthy)          0.0.0.
 
 2. `train_model_rain_australia` (`dags/retrain_model.py`)
     - Este DAG realiza el reentrenamiento del modelo basado en uno previamente cargado en MLflow. Si las métricas del nuevo modelo superan las del modelo existente, este se actualiza, se etiqueta como "champion" y se desmarca el anterior.
-    - Se ejecuta el primer día de cada mes a la 01:00 horas, una hora después del otro DAG.
+    - Se ejecuta el primer día de cada mes a la 02:00 horas, dos horas después del otro DAG.
