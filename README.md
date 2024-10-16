@@ -1,112 +1,95 @@
-# Ejemplo de Implementación de un Modelo de Heart Disease 
-### AMq2 - CEIA - FIUBA
+# Proyecto Final Aprendizaje de Máquina II - CEIA - FIUBA
 
-En este ejemplo, mostramos una implementación de un modelo productivo para detectar si un 
-paciente tiene una enfermedad cardiaca o no, utilizando el servicio de 
-**ML Models and something more Inc.**. Para ello, obtenemos los datos de 
-[Heart Disease - UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/45/heart+disease).
+### Integrantes:
+- Kevin Cajachuán Arroyo
+- Daniel Herrera
+- Augusto Doffo
+- Matías Marando
+- Omar Lopez Cabrera
+
+
+### Introducción
+
+En este TP integrador de la materia Aprendizaje de Máquinas II implementamos el ciclo completo de MLOps, desde el preprocesamiento de los datos hasta el despliegue de un modelo de ML en producción.
+
+El dataset utilizado es [Rain in Australia](https://www.kaggle.com/datasets/jsphyg/weather-dataset-rattle-package), el cual comprende aproximadamente 10 años de observaciones diarias del clima en numerosos lugares de Australia. El objetivo es predecir si lloverá o no al día siguiente en función de datos meteorológicos del día actual.
+
 
 La implementación incluye:
 
-- En Apache Airflow, un DAG que obtiene los datos del repositorio, realiza limpieza y 
-feature engineering, y guarda en el bucket `s3://data` los datos separados para entrenamiento 
+- En Apache Airflow, un DAG que obtiene los datos del repositorio, realiza limpieza y
+feature engineering, y guarda en el bucket `s3://data` los datos separados para entrenamiento
 y pruebas. MLflow hace seguimiento de este procesamiento.
-- Una notebook para ejecutar localmente con Optuna, que realiza una búsqueda de 
-hiperparámetros y encuentra el mejor modelo utilizando F1-score. Todo el experimento se 
-registra en MLflow, se generan gráficos de importancia de características, y además, se 
+- Una notebook para ejecutar localmente con Optuna, que realiza una búsqueda de
+hiperparámetros y encuentra el mejor modelo utilizando F1-score. Todo el experimento se
+registra en MLflow, se generan gráficos de importancia de características, y además, se
 registra el modelo en el registro de modelos de MLflow.
-- Un servicio de API del modelo, que toma el artefacto de MLflow y lo expone para realizar 
+- Un servicio de API del modelo, que toma el artefacto de MLflow y lo expone para realizar
 predicciones.
-- En Apache Airflow, un DAG que, dado un nuevo conjunto de datos, reentrena el modelo. Se 
-compara este modelo con el mejor modelo (llamado `champion`), y si es mejor, se reemplaza. Todo 
+- En Apache Airflow, un DAG que, dado un nuevo conjunto de datos, reentrena el modelo. Se
+compara este modelo con el mejor modelo (llamado `champion`), y si es mejor, se reemplaza. Todo
 se lleva a cabo siendo registrado en MLflow.
+- Una web API basada en Streamlit para interactuar fácilmente con el modelo.
 
-![Diagrama de servicios](example_project.png)
+![Diagrama de servicios](example_project.jpeg)
 
-Las flechas verdes y violetas representan nuevas conexiones en comparación con el proyecto base.
 
-## Testeo de Funcionamiento
+### Pasos para probar el proyecto
+- Clonar el [repositorio](https://github.com/Kajachuan/AMq2), utilizar el branch `main`
 
-El orden para probar el funcionamiento completo es el siguiente:
+- En Linux o MacOS: sustituir en el archivo `.env` el `AIRFLOW_UID` por el ID de usuario correspondiente (`id -u <nombre_usuario>`)
 
-1. Tan pronto como se levante el sistema multi-contenedor, ejecuta en Airflow el DAG 
-llamado `process_etl_heart_data`, de esta manera se crearán los datos en el 
-bucket `s3://data`.
-2. Ejecuta la notebook (ubicada en `notebook_example`) para realizar la búsqueda de 
-hiperparámetros y entrenar el mejor modelo.
-3. Utiliza el servicio de API.
+- Ejecutar `docker compose` en el directorio raíz del repositorio: `docker compose --profile all up`
 
-Además, una vez entrenado el modelo, puedes ejecutar el DAG `retrain_the_model` para probar 
-un nuevo modelo que compita con el campeón. Antes de hacer esto, ejecuta el DAG 
-`process_etl_heart_data` para que el conjunto de datos sea nuevo, de lo contrario se entrenará 
-el mismo modelo. Este proceso siempre dará como resultado que el modelo inicial es mejor... 
-el motivo de esto se deja al lector para que comprenda lo que está sucediendo.
+- En **Airflow** verán dos DAGS:
+    * `process_etl_rain_in_australia_data`
+    * `retrain_the_model`
 
-### API 
+- Ejecutar el DAG `*`process_etl_rain_in_australia_data`, de esta manera se crearán los datos en el bucket `s3://data`.
 
-Podemos realizar predicciones utilizando la API, accediendo a `http://localhost:8800/`.
+- Una vez finalizado, ejecutar la notebook `experiment_mlflow.ipynb`
 
-Para hacer una predicción, debemos enviar una solicitud al endpoint `Predict` con un 
-cuerpo de tipo JSON que contenga un campo de características (`features`) con cada 
-entrada para el modelo.
+- Opcionalmente, ejecutar el DAG `retrain_the_model`
 
-Un ejemplo utilizando `curl` sería:
+- Verificar en **MLFlow** la creación del experimento y del modelo registrado
 
-```bash
-curl -X 'POST' \
-  'http://localhost:8800/predict/' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "features": {
-    "age": 67,
-    "ca": 3,
-    "chol": 286,
-    "cp": 4,
-    "exang": 1,
-    "fbs": 0,
-    "oldpeak": 1.5,
-    "restecg": 2,
-    "sex": 1,
-    "slope": 2,
-    "thal": 3,
-    "thalach": 108,
-    "trestbps": 160
-  }
-}'
+- Verificar los datos generados en MinIO
+
+- Para probar el modelo:
+    * Ejecutar la notebook `fastapi.ipynb`
+    * Ingresar al web server de **Streamlit**
+    * En la página *Dashboard*, en la pestaña *Predicciones*, podrá ingresar los datos y hacer una predicción de lluvia
+
+- Para detener `docker compose` y eliminar todas las imágenes: `docker compose down --rmi all --volumes`
+
+Las URLs de los diferentes servicios son:
+- Apache Airflow: http://localhost:8080
+- MLflow: http://localhost:5000
+- MinIO: http://localhost:9001
+- FastAPI: http://localhost:8800/
+- Documentación de la API: http://localhost:8800/docs
+- Streamlit: http://localhost:8501/
+
+Para verificar el estado de los servicios ejecutar `docker -ps a`:
+
+```
+CONTAINER ID   IMAGE                      STATUS                          PORTS                                         NAMES
+25c4b6c32ec8   streamlit_app              Up 2 minutes (healthy)          0.0.0.0:8501->8501/tcp, :::8501->8501/tcp     streamlit_app
+ff8435af8e0a   backend_fastapi            Up 2 minutes (healthy)          0.0.0.0:8800->8800/tcp, :::8800->8800/tcp     fastapi
+1f87c84bfefb   extending_airflow:latest   Up 2 minutes (healthy)          8080/tcp                                      airflow_scheduler
+0529803ae5b7   extending_airflow:latest   Up 2 minutes (healthy)          0.0.0.0:8080->8080/tcp, :::8080->8080/tcp     airflow_webserver
+d0561c825747   mlflow                     Up 2 minutes (healthy)          0.0.0.0:5000->5000/tcp, :::5000->5000/tcp     mlflow
+6e7efae2b44d   postgres_system            Up 2 minutes (healthy)          0.0.0.0:5432->5432/tcp, :::5432->5432/tcp     postgres
+063adf9ccb41   minio/minio:latest         Up 2 minutes (healthy)          0.0.0.0:9000-9001->9000-9001/tcp              minio
 ```
 
-La respuesta del modelo será un valor booleano y un mensaje en forma de cadena de texto que 
-indicará si el paciente tiene o no una enfermedad cardiaca.
 
-```json
-{
-  "int_output": true,
-  "str_output": "Heart disease detected"
-}
-```
+### Descripción de los DAGs
 
-Para obtener más detalles sobre la API, ingresa a `http://localhost:8800/docs`.
+1. `process_etl_rain_in_australia_data` (`dags/etl_process.py`)
+    - Este DAG gestiona la carga de datos, transformaciones, división del conjunto de datos entrenamiento y validación, y la normalización de los datos.
+    - Se ejecuta el primer día de cada mes a las 00:00 horas.
 
-Nota: Recuerda que si esto se ejecuta en un servidor diferente a tu computadora, debes reemplazar 
-`localhost` por la IP correspondiente o el dominio DNS, si corresponde.
-
-Nota: Recordar que si esto se ejecuta en un servidor aparte de tu computadora, reemplazar a 
-localhost por la IP correspondiente o DNS domain si corresponde.
-
-La forma en que se implementó tiene la desventaja de que solo se puede hacer una predicción a 
-la vez, pero tiene la ventaja de que FastAPI y Pydantic nos permiten tener un fuerte control 
-sobre los datos sin necesidad de agregar una línea de código adicional. FastAPI maneja toda 
-la validación.
-
-Otra forma más típica es pasar los features como una lista u otro formato similar con 
-N observaciones y M features, lo que permite realizar varias predicciones al mismo tiempo. 
-Sin embargo, se pierde la validación automática.
-
-## Nota Final
-
-Si desean utilizar este proyecto como base para su propia implementación, es válido. 
-Además, podrían agregar un frontend que se comunique con la API para mejorar la experiencia 
-de usuario.
-
-También, si desean mejorar este ejemplo, ¡los Pull Requests son bienvenidos!
+2. `train_model_rain_australia` (`dags/retrain_model.py`)
+    - Este DAG realiza el reentrenamiento del modelo basado en uno previamente cargado en MLflow. Si las métricas del nuevo modelo superan las del modelo existente, este se actualiza, se etiqueta como "champion" y se desmarca el anterior.
+    - Se ejecuta el primer día de cada mes a la 01:00 horas, una hora después del otro DAG.
