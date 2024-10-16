@@ -9,11 +9,9 @@
 
 
 ### Introducción
-
 En este TP integrador de la materia Aprendizaje de Máquinas II implementamos el ciclo completo de MLOps, desde el preprocesamiento de los datos hasta el despliegue de un modelo de ML en producción.
 
 El dataset utilizado es [Rain in Australia](https://www.kaggle.com/datasets/jsphyg/weather-dataset-rattle-package), el cual comprende aproximadamente 10 años de observaciones diarias del clima en numerosos lugares de Australia. El objetivo es predecir si lloverá o no al día siguiente en función de datos meteorológicos del día actual.
-
 
 La implementación incluye:
 
@@ -36,35 +34,24 @@ se lleva a cabo siendo registrado en MLflow.
 
 ### Pasos para probar el proyecto
 - Clonar el [repositorio](https://github.com/Kajachuan/AMq2), utilizar el branch `main`
-
 - En Linux o MacOS: sustituir en el archivo `.env` el `AIRFLOW_UID` por el ID de usuario correspondiente (`id -u <nombre_usuario>`)
-
 - Ejecutar `docker compose` en el directorio raíz del repositorio: `docker compose --profile all up`
-
 - En **Airflow** se verán dos DAGS:
     * `process_etl_rain_in_australia_data`
     * `retrain_the_model`
-
 - Ejecutar el DAG `process_etl_rain_in_australia_data`, de esta manera se crearán los datos en el bucket `s3://data`
-
 - Una vez finalizado, ejecutar la notebook `experiment_mlflow.ipynb`
-
 - Opcionalmente, ejecutar el DAG `retrain_the_model`
-
 - Verificar en **MLFlow** la creación del experimento y del modelo registrado
-
 - Verificar los datos generados en MinIO
-
 - Para probar el modelo:
     * Ejecutar la notebook `fastapi.ipynb` o
     * Ingresar al web server de **Streamlit**
         * En la página *Dashboard*, en la pestaña *Predicciones*, ingresar los datos y hacer una predicción de lluvia
-
 - Para detener `docker compose` y eliminar todas las imágenes: `docker compose down --rmi all --volumes`
 
 
 ### URLs de los servicios
-
 - Apache Airflow: http://localhost:8080
 - MLflow: http://localhost:5000
 - MinIO: http://localhost:9001
@@ -87,7 +74,6 @@ d0561c825747   mlflow                     Up 2 minutes (healthy)          0.0.0.
 
 
 ### Descripción de los DAGs
-
 1. `process_etl_rain_in_australia_data` (`dags/etl_process.py`)
     - Este DAG gestiona la carga de datos, transformaciones, división del conjunto de datos entrenamiento y validación, y la normalización de los datos.
     - Se ejecuta el primer día de cada mes a las 00:00 horas.
