@@ -32,8 +32,8 @@ except Exception as e:
     st.error(f"Error al conectar con MinIO o al leer el archivo: {e}")
 
 
-st.write("# Trabajo práctico final de la materia Aprendizaje de maquina 2")
-st.write("##### *Esta pagina fue realizada con Streamlit y en ella podrá interactuar con el modelo de ML para predecir lluvias basado en el dataset Rain in Australia*")
+st.write("# Trabajo práctico final de la materia Aprendizaje de Máquina 2")
+st.write("##### *Esta página fue realizada con Streamlit y en ella podrá interactuar con el modelo de ML para predecir lluvias basado en el dataset Rain in Australia*")
 
 st.image("rain_aust.png", caption="")
 
@@ -105,7 +105,7 @@ with tab3:
 
     unique_locations = data['Location'].unique()
     Location = st.selectbox('Seleccione una ubicación', unique_locations)
-    
+
     MinTemp = st.number_input("MinTemp", min_value=None, max_value=None, value=13.6)
     MaxTemp = st.number_input("MaxTemp", min_value=None, max_value=None, value=28.3)
     Rainfall = st.number_input("Rainfall", min_value=None, max_value=None, value=2.6)
@@ -117,10 +117,10 @@ with tab3:
 
     WindGustSpeed = st.number_input("WindGustSpeed", min_value=None, max_value=None, value=44.3)
 
-    WindDir9am_dir = ["E","ENE","ESE","N","NE","NNE","NNW","NW","S","SE","SSE","SSW","SW","W","WNW","WSW"] 
+    WindDir9am_dir = ["E","ENE","ESE","N","NE","NNE","NNW","NW","S","SE","SSE","SSW","SW","W","WNW","WSW"]
     WindDir9am = st.selectbox('WindDir9am', dir)
 
-    WindDir3pm_dir = ["E","ENE","ESE","N","NE","NNE","NNW","NW","S","SE","SSE","SSW","SW","W","WNW","WSW"] 
+    WindDir3pm_dir = ["E","ENE","ESE","N","NE","NNE","NNW","NW","S","SE","SSE","SSW","SW","W","WNW","WSW"]
     WindDir3pm = st.selectbox('WindDir3pm', dir)
 
     WindSpeed9am = st.number_input("WindSpeed9am", min_value=None, max_value=None, value=41.9)
@@ -136,10 +136,10 @@ with tab3:
 
     RainToday  = st.checkbox("RainToday")
 
-   
+
     if st.button("Predecir"):
         processing = st.empty()
-        processing.write("Procesando petición...." ) 
+        processing.write("Procesando petición...." )
 
         data = {
             "features": {
@@ -164,7 +164,7 @@ with tab3:
                 "Cloud3pm": Cloud3pm,
                 "Temp9am": Temp9am,
                 "Temp3pm": Temp3pm,
-                "RainToday": RainToday 
+                "RainToday": RainToday
             }
         }
 
@@ -188,8 +188,8 @@ with tab3:
 with tab4:
 
     with st.form("Encuesta"):
-        st.write("##### *Emita su opiñon sobre el TP final de materia*")
-        checkbox_val1 = st.checkbox("Fantastico")
+        st.write("##### *Emita su opinión sobre el TP final de materia*")
+        checkbox_val1 = st.checkbox("Fantástico")
         checkbox_val2 = st.checkbox("Inmejorable")
         checkbox_val3 = st.checkbox("Tienen un 10+ felicitado")
 
